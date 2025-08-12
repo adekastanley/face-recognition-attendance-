@@ -21,7 +21,7 @@
 // 		})
 // 	);
 // }
-import { faceapi } from "./face-api";
+import { loadFaceApi } from "./face-api";
 
 // Helper function to get all person folders
 async function getPersonFolders(): Promise<string[]> {
@@ -74,6 +74,7 @@ async function getPersonImages(personName: string): Promise<string[]> {
 }
 
 export async function loadLabeledImages() {
+	const faceapi = await loadFaceApi();
 	const labels = await getPersonFolders();
 	console.log('Loading faces for:', labels);
 

@@ -95,7 +95,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { faceapi } from "@/lib/face-api";
+import { loadFaceApi } from "@/lib/face-api";
 import { loadLabeledImages } from "@/lib/loadLabeledImages";
 import { attendanceManager } from "@/lib/attendance";
 import AttendanceList from "@/components/AttendanceList";
@@ -107,19 +107,23 @@ export default function Home() {
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const [modelsLoaded, setModelsLoaded] = useState(false);
-	const [faceMatcher, setFaceMatcher] = useState<faceapi.FaceMatcher | null>(null);
+	const [faceApi, setFaceApi] = useState<any>(null);
+	const [faceMatcher, setFaceMatcher] = useState<any>(null);
 	const [isVideoOn, setIsVideoOn] = useState(true);
 	const [detectionInterval, setDetectionInterval] = useState<NodeJS.Timeout | null>(null);
 	const [lastDetectionTime, setLastDetectionTime] = useState<{ [key: string]: number }>({});
 
-	// Load models once on client
+	// Load face-api and models once on client
 	useEffect(() => {
 		const load = async () => {
 			try {
-				await faceapi.nets.tinyFaceDetector.loadFromUri("/models");
-				await faceapi.nets.faceLandmark68Net.loadFromUri("/models");
-				await faceapi.nets.faceRecognitionNet.loadFromUri("/models");
-				await faceapi.nets.ssdMobilenetv1.loadFromUri("/models");
+				const api = await loadFaceApi();
+				setFaceApi(api);
+				
+				await api.nets.tinyFaceDetector.loadFromUri("/models");
+				await api.nets.faceLandmark68Net.loadFromUri("/models");
+				await api.nets.faceRecognitionNet.loadFromUri("/models");
+				await api.nets.ssdMobilenetv1.loadFromUri("/models");
 				setModelsLoaded(true);
 				console.log("All models loaded");
 			} catch (error) {
@@ -159,12 +163,12 @@ export default function Home() {
 
 	// Load labeled data once
 	useEffect(() => {
-		if (!modelsLoaded) return;
+		if (!modelsLoaded || !faceApi) return;
 
 		const loadLabels = async () => {
 			try {
 				const labeledDescriptors = await loadLabeledImages();
-				const matcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
+				const matcher = new faceApi.FaceMatcher(labeledDescriptors, 0.6);
 				setFaceMatcher(matcher);
 				console.log("Labeled images loaded");
 			} catch (error) {
@@ -173,7 +177,7 @@ export default function Home() {
 		};
 
 		loadLabels();
-	}, [modelsLoaded]);
+	}, [modelsLoaded, faceApi]);
 
 	// Capture face image for attendance record
 	const captureAttendanceImage = (canvas: HTMLCanvasElement, detection: any): string => {
@@ -199,24 +203,24 @@ export default function Home() {
 	const handleVideoPlay = () => {
 		const video = videoRef.current;
 		const canvas = canvasRef.current;
-		if (!video || !canvas || !faceMatcher) return;
+		if (!video || !canvas || !faceMatcher || !faceApi) return;
 
 		const displaySize = {
 			width: video.videoWidth,
 			height: video.videoHeight,
 		};
-		faceapi.matchDimensions(canvas, displaySize);
+		faceApi.matchDimensions(canvas, displaySize);
 
 		const interval = setInterval(async () => {
 			if (!video || video.paused || video.ended) return;
 
 			try {
-				const detections = await faceapi
-					.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+				const detections = await faceApi
+					.detectAllFaces(video, new faceApi.TinyFaceDetectorOptions())
 					.withFaceLandmarks()
 					.withFaceDescriptors();
 
-				const resized = faceapi.resizeResults(detections, displaySize);
+				const resized = faceApi.resizeResults(detections, displaySize);
 				const ctx = canvas.getContext("2d");
 				ctx?.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -249,7 +253,7 @@ export default function Home() {
 						}
 
 						// Draw box with green color for known faces
-						const drawBox = new faceapi.draw.DrawBox(box, {
+						const drawBox = new faceApi.draw.DrawBox(box, {
 							label: `${bestMatch.label} (${(confidence * 100).toFixed(0)}%)`,
 							lineWidth: 2,
 							boxColor: '#10b981'
@@ -257,7 +261,7 @@ export default function Home() {
 						drawBox.draw(canvas);
 					} else {
 						// Draw box with red color for unknown faces
-						const drawBox = new faceapi.draw.DrawBox(box, {
+						const drawBox = new faceApi.draw.DrawBox(box, {
 							label: "Unknown",
 							lineWidth: 2,
 							boxColor: '#ef4444'
