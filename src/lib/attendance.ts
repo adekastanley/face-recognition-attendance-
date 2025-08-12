@@ -150,16 +150,127 @@ export class AttendanceManager {
     document.body.removeChild(link);
   }
 
+  // Get daily attendance (first entry per person per day)
+  getDailyAttendance(date?: Date): AttendanceRecord[] {
+    const targetDate = date || new Date();
+    const dayStart = new Date(targetDate);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(targetDate);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const dayRecords = this.records.filter(record => 
+      record.timestamp >= dayStart && record.timestamp <= dayEnd
+    );
+
+    // Get only the first entry per person for the day
+    const firstEntries = new Map<string, AttendanceRecord>();
+    
+    // Sort by timestamp ascending to get earliest entries first
+    dayRecords.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    
+    dayRecords.forEach(record => {
+      if (!firstEntries.has(record.name)) {
+        firstEntries.set(record.name, record);
+      }
+    });
+
+    return Array.from(firstEntries.values()).sort((a, b) => 
+      a.timestamp.getTime() - b.timestamp.getTime()
+    );
+  }
+
+  // Get all activity logs (all entries)
+  getActivityLog(date?: Date): AttendanceRecord[] {
+    if (!date) {
+      return [...this.records];
+    }
+
+    const dayStart = new Date(date);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(date);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    return this.records.filter(record => 
+      record.timestamp >= dayStart && record.timestamp <= dayEnd
+    );
+  }
+
+  // Export daily attendance to CSV
+  exportDailyAttendanceToCSV(date?: Date): string {
+    const dailyRecords = this.getDailyAttendance(date);
+    const headers = ['Name', 'First Entry Time', 'Date', 'Confidence'];
+    const csvContent = [
+      headers.join(','),
+      ...dailyRecords.map(record => [
+        `"${record.name}"`,
+        record.timestamp.toLocaleTimeString(),
+        record.timestamp.toLocaleDateString(),
+        record.confidence.toFixed(2)
+      ].join(','))
+    ].join('\n');
+
+    return csvContent;
+  }
+
+  // Export activity log to CSV (existing functionality)
+  exportActivityLogToCSV(date?: Date): string {
+    const activityRecords = this.getActivityLog(date);
+    const headers = ['ID', 'Name', 'Date', 'Time', 'Confidence'];
+    const csvContent = [
+      headers.join(','),
+      ...activityRecords.map(record => [
+        record.id,
+        `"${record.name}"`,
+        record.timestamp.toLocaleDateString(),
+        record.timestamp.toLocaleTimeString(),
+        record.confidence.toFixed(2)
+      ].join(','))
+    ].join('\n');
+
+    return csvContent;
+  }
+
+  // Download daily attendance CSV
+  downloadDailyAttendanceCSV(date?: Date, filename?: string): void {
+    const csvContent = this.exportDailyAttendanceToCSV(date);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    const dateStr = (date || new Date()).toISOString().split('T')[0];
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename || `daily-attendance-${dateStr}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // Download activity log CSV (rename existing method)
+  downloadActivityLogCSV(date?: Date, filename?: string): void {
+    const csvContent = this.exportActivityLogToCSV(date);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    const dateStr = (date || new Date()).toISOString().split('T')[0];
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename || `activity-log-${dateStr}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   // Get statistics
   getStats() {
     const today = this.getTodayRecords();
-    const uniqueToday = new Set(today.map(r => r.name)).size;
+    const dailyAttendance = this.getDailyAttendance();
     const uniqueTotal = new Set(this.records.map(r => r.name)).size;
     
     return {
       totalRecords: this.records.length,
       todayRecords: today.length,
-      uniquePeopleToday: uniqueToday,
+      dailyAttendanceCount: dailyAttendance.length,
+      uniquePeopleToday: dailyAttendance.length,
       uniquePeopleTotal: uniqueTotal,
       lastAttendance: this.records.length > 0 ? this.records[0].timestamp : null
     };
