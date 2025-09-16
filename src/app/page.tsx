@@ -110,8 +110,11 @@ export default function Home() {
 	const [faceApi, setFaceApi] = useState<any>(null);
 	const [faceMatcher, setFaceMatcher] = useState<any>(null);
 	const [isVideoOn, setIsVideoOn] = useState(true);
-	const [detectionInterval, setDetectionInterval] = useState<NodeJS.Timeout | null>(null);
-	const [lastDetectionTime, setLastDetectionTime] = useState<{ [key: string]: number }>({});
+	const [detectionInterval, setDetectionInterval] =
+		useState<NodeJS.Timeout | null>(null);
+	const [lastDetectionTime, setLastDetectionTime] = useState<{
+		[key: string]: number;
+	}>({});
 
 	// Load face-api and models once on client
 	useEffect(() => {
@@ -119,7 +122,7 @@ export default function Home() {
 			try {
 				const api = await loadFaceApi();
 				setFaceApi(api);
-				
+
 				await api.nets.tinyFaceDetector.loadFromUri("/models");
 				await api.nets.faceLandmark68Net.loadFromUri("/models");
 				await api.nets.faceRecognitionNet.loadFromUri("/models");
@@ -139,8 +142,8 @@ export default function Home() {
 
 		const startVideo = async () => {
 			try {
-				const stream = await navigator.mediaDevices.getUserMedia({ 
-					video: { width: 640, height: 480 } 
+				const stream = await navigator.mediaDevices.getUserMedia({
+					video: { width: 640, height: 480 },
 				});
 				if (videoRef.current) {
 					videoRef.current.srcObject = stream;
@@ -156,7 +159,7 @@ export default function Home() {
 		return () => {
 			if (videoRef.current?.srcObject) {
 				const stream = videoRef.current.srcObject as MediaStream;
-				stream.getTracks().forEach(track => track.stop());
+				stream.getTracks().forEach((track) => track.stop());
 			}
 		};
 	}, [modelsLoaded, isVideoOn]);
@@ -180,22 +183,25 @@ export default function Home() {
 	}, [modelsLoaded, faceApi]);
 
 	// Capture face image for attendance record
-	const captureAttendanceImage = (canvas: HTMLCanvasElement, detection: any): string => {
+	const captureAttendanceImage = (
+		canvas: HTMLCanvasElement,
+		detection: any
+	): string => {
 		try {
 			const { x, y, width, height } = detection.detection.box;
-			const faceCanvas = document.createElement('canvas');
-			const faceCtx = faceCanvas.getContext('2d');
-			
-			if (!faceCtx) return '';
-			
+			const faceCanvas = document.createElement("canvas");
+			const faceCtx = faceCanvas.getContext("2d");
+
+			if (!faceCtx) return "";
+
 			faceCanvas.width = width;
 			faceCanvas.height = height;
-			
+
 			faceCtx.drawImage(canvas, x, y, width, height, 0, 0, width, height);
-			return faceCanvas.toDataURL('image/jpeg', 0.8);
+			return faceCanvas.toDataURL("image/jpeg", 0.8);
 		} catch (error) {
-			console.error('Error capturing face image:', error);
-			return '';
+			console.error("Error capturing face image:", error);
+			return "";
 		}
 	};
 
@@ -224,70 +230,108 @@ export default function Home() {
 				const ctx = canvas.getContext("2d");
 				ctx?.clearRect(0, 0, canvas.width, canvas.height);
 
-				resized.forEach((detection) => {
-					const box = detection.detection.box;
-					const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
-					const confidence = 1 - bestMatch.distance;
+				interface DetectionWithDescriptor {
+					detection: {
+						box: {
+							x: number;
+							y: number;
+							width: number;
+							height: number;
+						};
+					};
+					descriptor: Float32Array;
+				}
 
-					// Only process known faces (not "unknown")
-					if (bestMatch.label !== "unknown" && confidence > 0.4) {
-						const now = Date.now();
-						const lastTime = lastDetectionTime[bestMatch.label] || 0;
+				interface StudentMeta {
+					matric_number: string;
+					email: string;
+					department: string;
+				}
 
-						// Log attendance if enough time has passed (30 seconds)
-						if (now - lastTime > 30000) {
-							const imageData = captureAttendanceImage(canvas, detection);
-							
-							// Get student metadata for this person
-							const studentMeta = getStudentMetadata(bestMatch.label);
-							
-							const success = attendanceManager.addRecord(
-								bestMatch.label,
-								confidence,
-								imageData,
-								studentMeta ? {
-									matric_number: studentMeta.matric_number,
-									email: studentMeta.email,
-									department: studentMeta.department
-								} : undefined
-							);
+				interface AttendanceRecordMeta {
+					matric_number: string;
+					email: string;
+					department: string;
+				}
 
-							if (success) {
-								setLastDetectionTime(prev => ({
-									...prev,
-									[bestMatch.label]: now
-								}));
-								const logMessage = studentMeta ? 
-									`Attendance recorded for ${bestMatch.label} (${studentMeta.matric_number})` :
-									`Attendance recorded for ${bestMatch.label}`;
-								console.log(logMessage);
+				(resized as DetectionWithDescriptor[]).forEach(
+					(detection: DetectionWithDescriptor) => {
+						const box = detection.detection.box;
+						const bestMatch: { label: string; distance: number } =
+							faceMatcher.findBestMatch(detection.descriptor);
+						const confidence: number = 1 - bestMatch.distance;
+
+						// Only process known faces (not "unknown")
+						if (bestMatch.label !== "unknown" && confidence > 0.4) {
+							const now: number = Date.now();
+							const lastTime: number = lastDetectionTime[bestMatch.label] || 0;
+
+							// Log attendance if enough time has passed (30 seconds)
+							if (now - lastTime > 30000) {
+								const imageData: string = captureAttendanceImage(
+									canvas,
+									detection
+								);
+
+								// Get student metadata for this person
+								const studentMeta: StudentMeta | undefined = getStudentMetadata(
+									bestMatch.label
+								);
+
+								const success: boolean = attendanceManager.addRecord(
+									bestMatch.label,
+									confidence,
+									imageData,
+									studentMeta
+										? ({
+												matric_number: studentMeta.matric_number,
+												email: studentMeta.email,
+												department: studentMeta.department,
+										  } as AttendanceRecordMeta)
+										: undefined
+								);
+
+								if (success) {
+									setLastDetectionTime((prev: { [key: string]: number }) => ({
+										...prev,
+										[bestMatch.label]: now,
+									}));
+									const logMessage: string = studentMeta
+										? `Attendance recorded for ${bestMatch.label} (${studentMeta.matric_number})`
+										: `Attendance recorded for ${bestMatch.label}`;
+									console.log(logMessage);
+								}
 							}
-						}
 
-						// Draw box with green color for known faces
-						const studentMeta = getStudentMetadata(bestMatch.label);
-						const displayLabel = studentMeta ? 
-							`${bestMatch.label} (${studentMeta.matric_number}) - ${(confidence * 100).toFixed(0)}%` :
-							`${bestMatch.label} (${(confidence * 100).toFixed(0)}%)`;
-							
-						const drawBox = new faceApi.draw.DrawBox(box, {
-							label: displayLabel,
-							lineWidth: 2,
-							boxColor: '#10b981'
-						});
-						drawBox.draw(canvas);
-					} else {
-						// Draw box with red color for unknown faces
-						const drawBox = new faceApi.draw.DrawBox(box, {
-							label: "Unknown",
-							lineWidth: 2,
-							boxColor: '#ef4444'
-						});
-						drawBox.draw(canvas);
+							// Draw box with green color for known faces
+							const studentMeta: StudentMeta | undefined = getStudentMetadata(
+								bestMatch.label
+							);
+							const displayLabel: string = studentMeta
+								? `${bestMatch.label} (${studentMeta.matric_number}) - ${(
+										confidence * 100
+								  ).toFixed(0)}%`
+								: `${bestMatch.label} (${(confidence * 100).toFixed(0)}%)`;
+
+							const drawBox = new faceApi.draw.DrawBox(box, {
+								label: displayLabel,
+								lineWidth: 2,
+								boxColor: "#10b981",
+							});
+							drawBox.draw(canvas);
+						} else {
+							// Draw box with red color for unknown faces
+							const drawBox = new faceApi.draw.DrawBox(box, {
+								label: "Unknown",
+								lineWidth: 2,
+								boxColor: "#ef4444",
+							});
+							drawBox.draw(canvas);
+						}
 					}
-				});
+				);
 			} catch (error) {
-				console.error('Error in face detection:', error);
+				console.error("Error in face detection:", error);
 			}
 		}, 100);
 
@@ -303,10 +347,10 @@ export default function Home() {
 			clearInterval(detectionInterval);
 			setDetectionInterval(null);
 		}
-		
+
 		if (videoRef.current?.srcObject) {
 			const stream = videoRef.current.srcObject as MediaStream;
-			stream.getTracks().forEach(track => track.stop());
+			stream.getTracks().forEach((track) => track.stop());
 			videoRef.current.srcObject = null;
 		}
 
@@ -377,18 +421,22 @@ export default function Home() {
 										<div className="text-center text-gray-400">
 											<Camera className="h-12 w-12 mx-auto mb-2" />
 											<p>Camera is off</p>
-											<p className="text-sm mt-1">Click "Start Camera" to begin</p>
+											<p className="text-sm mt-1">
+												Click "Start Camera" to begin
+											</p>
 										</div>
 									</div>
 								)}
 							</div>
-							
+
 							{/* Status */}
 							<div className="mt-4 text-center">
 								{!modelsLoaded ? (
 									<div className="flex items-center justify-center space-x-2">
 										<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-										<p className="text-sm text-gray-500">Loading AI models...</p>
+										<p className="text-sm text-gray-500">
+											Loading AI models...
+										</p>
 									</div>
 								) : isVideoOn ? (
 									<p className="text-sm text-green-600 font-medium">
