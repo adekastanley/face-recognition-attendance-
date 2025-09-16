@@ -9,6 +9,7 @@ import { Upload, Camera, UserPlus, ArrowLeft, Check, X } from 'lucide-react';
 import Link from 'next/link';
 
 interface PersonData {
+  matric_number: string;
   name: string;
   email?: string;
   department?: string;
@@ -17,6 +18,7 @@ interface PersonData {
 
 export default function ManagePage() {
   const [personData, setPersonData] = useState<PersonData>({
+    matric_number: '',
     name: '',
     email: '',
     department: '',
@@ -50,8 +52,13 @@ export default function ManagePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!personData.matric_number.trim()) {
+      alert('Please enter a matriculation number for the student.');
+      return;
+    }
+
     if (!personData.name.trim()) {
-      alert('Please enter a name for the person.');
+      alert('Please enter a name for the student.');
       return;
     }
 
@@ -65,6 +72,7 @@ export default function ManagePage() {
 
     try {
       const formData = new FormData();
+      formData.append('matric_number', personData.matric_number.trim());
       formData.append('name', personData.name.trim());
       formData.append('email', personData.email || '');
       formData.append('department', personData.department || '');
@@ -80,7 +88,7 @@ export default function ManagePage() {
 
       if (response.ok) {
         setUploadStatus('success');
-        setPersonData({ name: '', email: '', department: '', images: [] });
+        setPersonData({ matric_number: '', name: '', email: '', department: '', images: [] });
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
@@ -146,6 +154,24 @@ export default function ManagePage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Personal Information */}
               <div className="space-y-4">
+                <div>
+                  <Label htmlFor="matric_number" className="text-sm font-medium">
+                    Matriculation Number *
+                  </Label>
+                  <Input
+                    id="matric_number"
+                    type="text"
+                    value={personData.matric_number}
+                    onChange={(e) => handleInputChange('matric_number', e.target.value)}
+                    placeholder="e.g., u/22/cs/0123"
+                    required
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    This is the primary identifier for the student
+                  </p>
+                </div>
+                
                 <div>
                   <Label htmlFor="name" className="text-sm font-medium">
                     Full Name *
@@ -266,7 +292,7 @@ export default function ManagePage() {
               <div className="flex space-x-3">
                 <Button
                   type="submit"
-                  disabled={isUploading || !personData.name.trim() || personData.images.length === 0}
+                  disabled={isUploading || !personData.matric_number.trim() || !personData.name.trim() || personData.images.length === 0}
                   className="flex-1"
                 >
                   {isUploading ? (

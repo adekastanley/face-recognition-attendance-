@@ -96,7 +96,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { loadFaceApi } from "@/lib/face-api";
-import { loadLabeledImages } from "@/lib/loadLabeledImages";
+import { loadLabeledImages, getStudentMetadata } from "@/lib/loadLabeledImages";
 import { attendanceManager } from "@/lib/attendance";
 import AttendanceList from "@/components/AttendanceList";
 import { Button } from "@/components/ui/button";
@@ -237,10 +237,19 @@ export default function Home() {
 						// Log attendance if enough time has passed (30 seconds)
 						if (now - lastTime > 30000) {
 							const imageData = captureAttendanceImage(canvas, detection);
+							
+							// Get student metadata for this person
+							const studentMeta = getStudentMetadata(bestMatch.label);
+							
 							const success = attendanceManager.addRecord(
 								bestMatch.label,
 								confidence,
-								imageData
+								imageData,
+								studentMeta ? {
+									matric_number: studentMeta.matric_number,
+									email: studentMeta.email,
+									department: studentMeta.department
+								} : undefined
 							);
 
 							if (success) {
@@ -248,13 +257,21 @@ export default function Home() {
 									...prev,
 									[bestMatch.label]: now
 								}));
-								console.log(`Attendance recorded for ${bestMatch.label}`);
+								const logMessage = studentMeta ? 
+									`Attendance recorded for ${bestMatch.label} (${studentMeta.matric_number})` :
+									`Attendance recorded for ${bestMatch.label}`;
+								console.log(logMessage);
 							}
 						}
 
 						// Draw box with green color for known faces
+						const studentMeta = getStudentMetadata(bestMatch.label);
+						const displayLabel = studentMeta ? 
+							`${bestMatch.label} (${studentMeta.matric_number}) - ${(confidence * 100).toFixed(0)}%` :
+							`${bestMatch.label} (${(confidence * 100).toFixed(0)}%)`;
+							
 						const drawBox = new faceApi.draw.DrawBox(box, {
-							label: `${bestMatch.label} (${(confidence * 100).toFixed(0)}%)`,
+							label: displayLabel,
 							lineWidth: 2,
 							boxColor: '#10b981'
 						});

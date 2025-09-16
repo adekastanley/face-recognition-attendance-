@@ -23,6 +23,22 @@
 // }
 import { loadFaceApi } from "./face-api";
 
+interface PersonMetadata {
+	matric_number: string;
+	name: string;
+	email?: string;
+	department?: string;
+	dateAdded: string;
+	images: Array<{
+		filename: string;
+		size: number;
+		type: string;
+	}>;
+}
+
+// Global metadata cache
+let studentMetadata: Map<string, PersonMetadata> = new Map();
+
 // Helper function to get all person folders
 async function getPersonFolders(): Promise<string[]> {
 	try {
@@ -41,17 +57,29 @@ async function getPersonFolders(): Promise<string[]> {
 	return ["adeka stanley"];
 }
 
-// Helper function to get all images for a person
-async function getPersonImages(personName: string): Promise<string[]> {
+// Helper function to load student metadata
+async function loadPersonMetadata(personName: string): Promise<PersonMetadata | null> {
 	try {
-		// Try to fetch metadata first
 		const metadataResponse = await fetch(`/known/${personName}/metadata.json`);
 		if (metadataResponse.ok) {
 			const metadata = await metadataResponse.json();
-			return metadata.images?.map((img: any) => `/known/${personName}/${img.filename}`) || [];
+			// Store in cache for later use
+			studentMetadata.set(metadata.name, metadata);
+			console.log(`✓ Loaded metadata for ${metadata.name} (${metadata.matric_number})`);
+			return metadata;
 		}
 	} catch (error) {
 		console.warn(`Could not load metadata for ${personName}:`, error);
+	}
+	return null;
+}
+
+// Helper function to get all images for a person
+async function getPersonImages(personName: string): Promise<string[]> {
+	const metadata = await loadPersonMetadata(personName);
+	
+	if (metadata) {
+		return metadata.images?.map((img: any) => `/known/${personName}/${img.filename}`) || [];
 	}
 
 	// Fallback: try common image names
@@ -113,4 +141,14 @@ export async function loadLabeledImages() {
 			return new faceapi.LabeledFaceDescriptors(label, descriptions);
 		})
 	).then(results => results.filter(result => result !== null));
+}
+
+// Export function to get student metadata by name
+export function getStudentMetadata(studentName: string): PersonMetadata | null {
+	return studentMetadata.get(studentName) || null;
+}
+
+// Export function to get all loaded student metadata
+export function getAllStudentMetadata(): Map<string, PersonMetadata> {
+	return new Map(studentMetadata);
 }

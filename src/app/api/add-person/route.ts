@@ -5,8 +5,16 @@ import path from 'path';
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
+    const matric_number = formData.get('matric_number') as string;
     const name = formData.get('name') as string;
     
+    if (!matric_number) {
+      return NextResponse.json(
+        { error: 'Matriculation number is required' },
+        { status: 400 }
+      );
+    }
+
     if (!name) {
       return NextResponse.json(
         { error: 'Name is required' },
@@ -14,8 +22,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create directory for this person
-    const personDir = path.join(process.cwd(), 'public', 'known', name.toLowerCase());
+    // Create directory for this person using sanitized matric number
+    // Replace forward slashes with underscores to avoid nested directories
+    const sanitizedMatricNumber = matric_number.toLowerCase().replace(/\//g, '_');
+    const personDir = path.join(process.cwd(), 'public', 'known', sanitizedMatricNumber);
     
     try {
       await mkdir(personDir, { recursive: true });
@@ -61,6 +71,7 @@ export async function POST(request: NextRequest) {
 
     // You could also save metadata to a JSON file
     const metadata = {
+      matric_number,
       name,
       email: formData.get('email') as string || '',
       department: formData.get('department') as string || '',
@@ -73,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Added ${name} with ${savedImages.length} images`,
+      message: `Added ${name} (${matric_number}) with ${savedImages.length} images`,
       data: metadata
     });
 

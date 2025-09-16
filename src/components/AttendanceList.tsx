@@ -51,6 +51,14 @@ export default function AttendanceList({ onRecordsUpdate }: AttendanceListProps)
     attendanceManager.downloadActivityLogCSV();
   };
 
+  const handleExportDailyExcel = () => {
+    attendanceManager.exportDailyAttendanceToExcel();
+  };
+
+  const handleExportActivityExcel = () => {
+    attendanceManager.exportActivityLogToExcel();
+  };
+
   const handleExportJSON = () => {
     attendanceManager.downloadJSON();
   };
@@ -200,6 +208,11 @@ export default function AttendanceList({ onRecordsUpdate }: AttendanceListProps)
                         <p className="font-medium text-sm truncate">
                           {record.name}
                         </p>
+                        {record.matric_number && (
+                          <p className="text-xs text-blue-600 font-mono truncate">
+                            {record.matric_number}
+                          </p>
+                        )}
                         <div className="flex items-center space-x-2 text-xs text-muted-foreground">
                           <div className="flex items-center space-x-1">
                             <Clock className="h-3 w-3" />
@@ -256,37 +269,57 @@ export default function AttendanceList({ onRecordsUpdate }: AttendanceListProps)
           </CardHeader>
           <CardContent className="pt-2">
             <div className="space-y-2">
-              <div className="flex space-x-2">
+              <div className="grid grid-cols-3 gap-1">
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={viewMode === 'daily' ? handleExportDailyCSV : handleExportActivityCSV}
-                  className="flex-1"
+                  className="text-xs px-2"
                 >
                   <Download className="h-3 w-3 mr-1" />
-                  {viewMode === 'daily' ? 'Daily CSV' : 'Activity CSV'}
+                  CSV
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={viewMode === 'daily' ? handleExportDailyExcel : handleExportActivityExcel}
+                  className="text-xs px-2"
+                >
+                  <Download className="h-3 w-3 mr-1" />
+                  Excel
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={handleExportJSON}
-                  className="flex-1"
+                  className="text-xs px-2"
                 >
                   <Download className="h-3 w-3 mr-1" />
                   JSON
                 </Button>
               </div>
               
-              {/* Additional export option for the other view */}
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={viewMode === 'daily' ? handleExportActivityCSV : handleExportDailyCSV}
-                className="w-full text-xs"
-              >
-                <Download className="h-3 w-3 mr-1" />
-                Also export {viewMode === 'daily' ? 'Activity Log' : 'Daily Attendance'}
-              </Button>
+              {/* Additional export options for the other view */}
+              <div className="grid grid-cols-2 gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={viewMode === 'daily' ? handleExportActivityCSV : handleExportDailyCSV}
+                  className="text-xs"
+                >
+                  <Download className="h-3 w-3 mr-1" />
+                  {viewMode === 'daily' ? 'Activity CSV' : 'Daily CSV'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={viewMode === 'daily' ? handleExportActivityExcel : handleExportDailyExcel}
+                  className="text-xs"
+                >
+                  <Download className="h-3 w-3 mr-1" />
+                  {viewMode === 'daily' ? 'Activity Excel' : 'Daily Excel'}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

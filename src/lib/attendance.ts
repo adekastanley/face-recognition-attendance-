@@ -1,6 +1,9 @@
 export interface AttendanceRecord {
   id: string;
+  matric_number?: string;
   name: string;
+  email?: string;
+  department?: string;
   timestamp: Date;
   confidence: number;
   imageData?: string; // Base64 encoded image
@@ -45,7 +48,7 @@ export class AttendanceManager {
   }
 
   // Add new attendance record with debouncing
-  addRecord(name: string, confidence: number, imageData?: string): boolean {
+  addRecord(name: string, confidence: number, imageData?: string, metadata?: { matric_number?: string; email?: string; department?: string }): boolean {
     const now = Date.now();
     const lastDetection = this.lastDetections.get(name);
     
@@ -56,7 +59,10 @@ export class AttendanceManager {
 
     const record: AttendanceRecord = {
       id: `${name}-${now}`,
+      matric_number: metadata?.matric_number,
       name,
+      email: metadata?.email,
+      department: metadata?.department,
       timestamp: new Date(),
       confidence,
       imageData
@@ -100,14 +106,17 @@ export class AttendanceManager {
     this.saveRecords();
   }
 
-  // Export to CSV
+  // Export to CSV with full details
   exportToCSV(): string {
-    const headers = ['ID', 'Name', 'Date', 'Time', 'Confidence'];
+    const headers = ['ID', 'Matric Number', 'Name', 'Email', 'Department', 'Date', 'Time', 'Confidence'];
     const csvContent = [
       headers.join(','),
       ...this.records.map(record => [
         record.id,
+        `"${record.matric_number || 'N/A'}"`,
         `"${record.name}"`,
+        `"${record.email || 'N/A'}"`,
+        `"${record.department || 'N/A'}"`,
         record.timestamp.toLocaleDateString(),
         record.timestamp.toLocaleTimeString(),
         record.confidence.toFixed(2)
@@ -195,14 +204,17 @@ export class AttendanceManager {
     );
   }
 
-  // Export daily attendance to CSV
+  // Export daily attendance to CSV with full details
   exportDailyAttendanceToCSV(date?: Date): string {
     const dailyRecords = this.getDailyAttendance(date);
-    const headers = ['Name', 'First Entry Time', 'Date', 'Confidence'];
+    const headers = ['Matric Number', 'Name', 'Email', 'Department', 'First Entry Time', 'Date', 'Confidence'];
     const csvContent = [
       headers.join(','),
       ...dailyRecords.map(record => [
+        `"${record.matric_number || 'N/A'}"`,
         `"${record.name}"`,
+        `"${record.email || 'N/A'}"`,
+        `"${record.department || 'N/A'}"`,
         record.timestamp.toLocaleTimeString(),
         record.timestamp.toLocaleDateString(),
         record.confidence.toFixed(2)
@@ -212,15 +224,18 @@ export class AttendanceManager {
     return csvContent;
   }
 
-  // Export activity log to CSV (existing functionality)
+  // Export activity log to CSV with full details
   exportActivityLogToCSV(date?: Date): string {
     const activityRecords = this.getActivityLog(date);
-    const headers = ['ID', 'Name', 'Date', 'Time', 'Confidence'];
+    const headers = ['ID', 'Matric Number', 'Name', 'Email', 'Department', 'Date', 'Time', 'Confidence'];
     const csvContent = [
       headers.join(','),
       ...activityRecords.map(record => [
         record.id,
+        `"${record.matric_number || 'N/A'}"`,
         `"${record.name}"`,
+        `"${record.email || 'N/A'}"`,
+        `"${record.department || 'N/A'}"`,
         record.timestamp.toLocaleDateString(),
         record.timestamp.toLocaleTimeString(),
         record.confidence.toFixed(2)
@@ -258,6 +273,63 @@ export class AttendanceManager {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  }
+
+  // Export daily attendance to Excel
+  exportDailyAttendanceToExcel(date?: Date): void {
+    if (typeof window === 'undefined') return;
+    
+    const dailyRecords = this.getDailyAttendance(date);
+    const worksheet = [
+      ['Matric Number', 'Name', 'Email', 'Department', 'First Entry Time', 'Date', 'Confidence'],
+      ...dailyRecords.map(record => [
+        record.matric_number || 'N/A',
+        record.name,
+        record.email || 'N/A',
+        record.department || 'N/A',
+        record.timestamp.toLocaleTimeString(),
+        record.timestamp.toLocaleDateString(),
+        record.confidence.toFixed(2)
+      ])
+    ];
+    
+    this.downloadExcelFile(worksheet, `daily-attendance-${(date || new Date()).toISOString().split('T')[0]}.xlsx`);
+  }
+
+  // Export activity log to Excel
+  exportActivityLogToExcel(date?: Date): void {
+    if (typeof window === 'undefined') return;
+    
+    const activityRecords = this.getActivityLog(date);
+    const worksheet = [
+      ['ID', 'Matric Number', 'Name', 'Email', 'Department', 'Date', 'Time', 'Confidence'],
+      ...activityRecords.map(record => [
+        record.id,
+        record.matric_number || 'N/A',
+        record.name,
+        record.email || 'N/A',
+        record.department || 'N/A',
+        record.timestamp.toLocaleDateString(),
+        record.timestamp.toLocaleTimeString(),
+        record.confidence.toFixed(2)
+      ])
+    ];
+    
+    this.downloadExcelFile(worksheet, `activity-log-${(date || new Date()).toISOString().split('T')[0]}.xlsx`);
+  }
+
+  // Helper method to download Excel file
+  private downloadExcelFile(data: any[][], filename: string): void {
+    if (typeof window === 'undefined') return;
+    
+    import('xlsx').then((XLSX) => {
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
+      XLSX.writeFile(wb, filename);
+    }).catch(error => {
+      console.error('Error exporting to Excel:', error);
+    });
   }
 
   // Get statistics
